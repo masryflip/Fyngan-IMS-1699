@@ -10,14 +10,14 @@ import {
   userService,
   subscribeToTable 
 } from '../services/inventoryService';
-import { supabase } from '../lib/supabase';
 
 const SupabaseInventoryContext = createContext();
 
 export function SupabaseInventoryProvider({ children }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [initialized, setInitialized] = useState(false);
   
   // State
   const [locations, setLocations] = useState([]);
@@ -29,18 +29,37 @@ export function SupabaseInventoryProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [currentLocationId, setCurrentLocationId] = useState(null);
 
-  // Load initial data
+  // Load initial data when user is authenticated
   useEffect(() => {
-    if (user?.id) {
+    if (isAuthenticated && user?.id && !initialized) {
+      console.log('User authenticated, loading inventory data...');
       loadAllData();
-      setupRealtimeSubscriptions();
+    } else if (!isAuthenticated) {
+      // Clear data when user logs out
+      console.log('User not authenticated, clearing data...');
+      clearAllData();
     }
-  }, [user]);
+  }, [isAuthenticated, user?.id, initialized]);
+
+  const clearAllData = () => {
+    setLocations([]);
+    setCategories([]);
+    setSuppliers([]);
+    setItems([]);
+    setOrders([]);
+    setTransfers([]);
+    setUsers([]);
+    setCurrentLocationId(null);
+    setInitialized(false);
+    setLoading(false);
+    setError(null);
+  };
 
   const loadAllData = async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Loading all inventory data...');
 
       // Load all data in parallel
       const [
@@ -52,14 +71,24 @@ export function SupabaseInventoryProvider({ children }) {
         transfersData,
         usersData
       ] = await Promise.all([
-        locationService.getAll(),
-        categoryService.getAll(),
-        supplierService.getAll(),
-        itemService.getAll(),
-        orderService.getAll(),
-        transferService.getAll(),
-        userService.getAll()
+        locationService.getAll().catch(err => { console.warn('Error loading locations:', err); return []; }),
+        categoryService.getAll().catch(err => { console.warn('Error loading categories:', err); return []; }),
+        supplierService.getAll().catch(err => { console.warn('Error loading suppliers:', err); return []; }),
+        itemService.getAll().catch(err => { console.warn('Error loading items:', err); return []; }),
+        orderService.getAll().catch(err => { console.warn('Error loading orders:', err); return []; }),
+        transferService.getAll().catch(err => { console.warn('Error loading transfers:', err); return []; }),
+        userService.getAll().catch(err => { console.warn('Error loading users:', err); return []; })
       ]);
+
+      console.log('Data loaded:', {
+        locations: locationsData.length,
+        categories: categoriesData.length,
+        suppliers: suppliersData.length,
+        items: itemsData.length,
+        orders: ordersData.length,
+        transfers: transfersData.length,
+        users: usersData.length
+      });
 
       setLocations(locationsData);
       setCategories(categoriesData);
@@ -72,38 +101,73 @@ export function SupabaseInventoryProvider({ children }) {
       // Set first location as current if none selected
       if (locationsData.length > 0 && !currentLocationId) {
         setCurrentLocationId(locationsData[0].id);
+        console.log('Set current location to:', locationsData[0].name);
       }
 
+      setInitialized(true);
+      console.log('Inventory data initialization complete');
+
+      // Set up real-time subscriptions after data loads
+      setupRealtimeSubscriptions();
+
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading inventory data:', error);
       setError(error.message);
+      
+      // Initialize with empty data on error
+      setLocations([]);
+      setCategories([]);
+      setSuppliers([]);
+      setItems([]);
+      setOrders([]);
+      setTransfers([]);
+      setUsers([]);
+      setInitialized(true);
     } finally {
       setLoading(false);
     }
   };
 
   const setupRealtimeSubscriptions = () => {
-    // Subscribe to changes in all tables
-    const subscriptions = [
-      subscribeToTable('locations_fyngan2024', handleLocationChange),
-      subscribeToTable('categories_fyngan2024', handleCategoryChange),
-      subscribeToTable('suppliers_fyngan2024', handleSupplierChange),
-      subscribeToTable('items_fyngan2024', handleItemChange),
-      subscribeToTable('item_locations_fyngan2024', handleItemLocationChange),
-      subscribeToTable('orders_fyngan2024', handleOrderChange),
-      subscribeToTable('transfers_fyngan2024', handleTransferChange),
-      subscribeToTable('users_fyngan2024', handleUserChange)
-    ];
+    if (!isAuthenticated) return;
+    
+    console.log('Setting up real-time subscriptions...');
+    
+    try {
+      // Subscribe to changes in all tables
+      const subscriptions = [
+        subscribeToTable('locations_fyngan2024', handleLocationChange),
+        subscribeToTable('categories_fyngan2024', handleCategoryChange),
+        subscribeToTable('suppliers_fyngan2024', handleSupplierChange),
+        subscribeToTable('items_fyngan2024', handleItemChange),
+        subscribeToTable('item_locations_fyngan2024', handleItemLocationChange),
+        subscribeToTable('orders_fyngan2024', handleOrderChange),
+        subscribeToTable('transfers_fyngan2024', handleTransferChange),
+        subscribeToTable('users_fyngan2024', handleUserChange)
+      ];
 
-    // Cleanup subscriptions on unmount
-    return () => {
-      subscriptions.forEach(sub => sub.unsubscribe());
-    };
+      console.log('Real-time subscriptions set up successfully');
+
+      // Cleanup subscriptions on unmount
+      return () => {
+        console.log('Cleaning up real-time subscriptions...');
+        subscriptions.forEach(sub => {
+          try {
+            sub.unsubscribe();
+          } catch (err) {
+            console.warn('Error unsubscribing:', err);
+          }
+        });
+      };
+    } catch (error) {
+      console.warn('Error setting up real-time subscriptions:', error);
+    }
   };
 
   // Real-time handlers
   const handleLocationChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('Location change:', eventType, newRecord?.name);
     
     setLocations(prev => {
       switch (eventType) {
@@ -121,6 +185,7 @@ export function SupabaseInventoryProvider({ children }) {
 
   const handleCategoryChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('Category change:', eventType, newRecord?.name);
     
     setCategories(prev => {
       switch (eventType) {
@@ -138,6 +203,7 @@ export function SupabaseInventoryProvider({ children }) {
 
   const handleSupplierChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('Supplier change:', eventType, newRecord?.name);
     
     setSuppliers(prev => {
       switch (eventType) {
@@ -155,6 +221,7 @@ export function SupabaseInventoryProvider({ children }) {
 
   const handleItemChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('Item change:', eventType, newRecord?.name);
     
     setItems(prev => {
       switch (eventType) {
@@ -171,12 +238,16 @@ export function SupabaseInventoryProvider({ children }) {
   };
 
   const handleItemLocationChange = (payload) => {
+    console.log('Item location change detected, refreshing items...');
     // Refresh items when stock levels change
-    loadItems();
+    if (initialized) {
+      loadItems();
+    }
   };
 
   const handleOrderChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('Order change:', eventType, newRecord?.id);
     
     setOrders(prev => {
       switch (eventType) {
@@ -194,6 +265,7 @@ export function SupabaseInventoryProvider({ children }) {
 
   const handleTransferChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('Transfer change:', eventType, newRecord?.id);
     
     setTransfers(prev => {
       switch (eventType) {
@@ -211,6 +283,7 @@ export function SupabaseInventoryProvider({ children }) {
 
   const handleUserChange = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.log('User change:', eventType, newRecord?.name);
     
     setUsers(prev => {
       switch (eventType) {
@@ -231,8 +304,9 @@ export function SupabaseInventoryProvider({ children }) {
     try {
       const data = await itemService.getAll();
       setItems(data);
+      console.log('Items reloaded:', data.length);
     } catch (error) {
-      console.error('Error loading items:', error);
+      console.error('Error reloading items:', error);
     }
   };
 
@@ -240,8 +314,9 @@ export function SupabaseInventoryProvider({ children }) {
     try {
       const data = await orderService.getAll();
       setOrders(data);
+      console.log('Orders reloaded:', data.length);
     } catch (error) {
-      console.error('Error loading orders:', error);
+      console.error('Error reloading orders:', error);
     }
   };
 
@@ -249,8 +324,9 @@ export function SupabaseInventoryProvider({ children }) {
     try {
       const data = await transferService.getAll();
       setTransfers(data);
+      console.log('Transfers reloaded:', data.length);
     } catch (error) {
-      console.error('Error loading transfers:', error);
+      console.error('Error reloading transfers:', error);
     }
   };
 
@@ -260,6 +336,7 @@ export function SupabaseInventoryProvider({ children }) {
     locations: {
       create: async (location) => {
         try {
+          console.log('Creating location:', location.name);
           const data = await locationService.create(location);
           return data;
         } catch (error) {
@@ -269,6 +346,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       update: async (id, updates) => {
         try {
+          console.log('Updating location:', id);
           const data = await locationService.update(id, updates);
           return data;
         } catch (error) {
@@ -278,6 +356,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       delete: async (id) => {
         try {
+          console.log('Deleting location:', id);
           await locationService.delete(id);
           return true;
         } catch (error) {
@@ -291,6 +370,7 @@ export function SupabaseInventoryProvider({ children }) {
     categories: {
       create: async (category) => {
         try {
+          console.log('Creating category:', category.name);
           const data = await categoryService.create(category);
           return data;
         } catch (error) {
@@ -300,6 +380,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       update: async (id, updates) => {
         try {
+          console.log('Updating category:', id);
           const data = await categoryService.update(id, updates);
           return data;
         } catch (error) {
@@ -309,6 +390,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       delete: async (id) => {
         try {
+          console.log('Deleting category:', id);
           await categoryService.delete(id);
           return true;
         } catch (error) {
@@ -322,6 +404,7 @@ export function SupabaseInventoryProvider({ children }) {
     items: {
       create: async (item) => {
         try {
+          console.log('Creating item:', item.name);
           const data = await itemService.create(item);
           await loadItems(); // Reload to get full data with relations
           return data;
@@ -332,6 +415,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       update: async (id, updates) => {
         try {
+          console.log('Updating item:', id);
           const data = await itemService.update(id, updates);
           await loadItems(); // Reload to get full data with relations
           return data;
@@ -342,6 +426,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       delete: async (id) => {
         try {
+          console.log('Deleting item:', id);
           await itemService.delete(id);
           return true;
         } catch (error) {
@@ -351,6 +436,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       updateStock: async (itemId, locationId, quantity, reason) => {
         try {
+          console.log('Updating stock:', { itemId, locationId, quantity });
           const data = await itemService.updateStock(itemId, locationId, quantity, reason);
           await loadItems(); // Reload to get updated stock levels
           return data;
@@ -365,6 +451,7 @@ export function SupabaseInventoryProvider({ children }) {
     orders: {
       create: async (order) => {
         try {
+          console.log('Creating order:', order);
           const orderWithUser = {
             ...order,
             created_by: user?.id
@@ -379,6 +466,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       update: async (id, updates) => {
         try {
+          console.log('Updating order:', id);
           const data = await orderService.update(id, updates);
           await loadOrders();
           return data;
@@ -389,6 +477,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       delete: async (id) => {
         try {
+          console.log('Deleting order:', id);
           await orderService.delete(id);
           return true;
         } catch (error) {
@@ -402,6 +491,7 @@ export function SupabaseInventoryProvider({ children }) {
     transfers: {
       create: async (transfer) => {
         try {
+          console.log('Creating transfer:', transfer);
           const transferWithUser = {
             ...transfer,
             created_by: user?.id
@@ -416,6 +506,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       update: async (id, updates) => {
         try {
+          console.log('Updating transfer:', id);
           const data = await transferService.update(id, updates);
           await loadTransfers();
           return data;
@@ -426,6 +517,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       complete: async (id) => {
         try {
+          console.log('Completing transfer:', id);
           const data = await transferService.complete(id);
           await loadTransfers();
           await loadItems(); // Reload items to get updated stock levels
@@ -437,6 +529,7 @@ export function SupabaseInventoryProvider({ children }) {
       },
       delete: async (id) => {
         try {
+          console.log('Deleting transfer:', id);
           await transferService.delete(id);
           return true;
         } catch (error) {
@@ -450,6 +543,7 @@ export function SupabaseInventoryProvider({ children }) {
     users: {
       updateProfile: async (userId, profile) => {
         try {
+          console.log('Updating user profile:', userId);
           const data = await userService.updateProfile(userId, profile);
           return data;
         } catch (error) {
@@ -472,6 +566,7 @@ export function SupabaseInventoryProvider({ children }) {
     currentLocationId,
     loading,
     error,
+    initialized,
 
     // Actions
     setCurrentLocationId,

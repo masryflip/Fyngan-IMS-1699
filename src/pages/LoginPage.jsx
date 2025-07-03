@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -9,7 +9,7 @@ const { FiCoffee, FiShield, FiTrendingUp, FiUsers, FiMail, FiLock, FiEye, FiEyeO
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, signUp, loading } = useAuth();
+  const { signIn, signUp, loading, isAuthenticated, user } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,9 +20,19 @@ function LoginPage() {
   });
   const [error, setError] = useState('');
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('User already authenticated, redirecting to dashboard');
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    console.log('Form submitted:', { isSignUp, email: formData.email });
 
     if (isSignUp) {
       // Sign up validation
@@ -40,13 +50,17 @@ function LoginPage() {
       });
 
       if (error) {
+        console.error('Sign up error:', error);
         setError(error.message);
       } else {
+        console.log('Sign up successful:', data);
+        
         // Check if email confirmation is required
         if (data.user && !data.session) {
           setError('Please check your email to confirm your account');
-        } else {
-          navigate('/');
+        } else if (data.session) {
+          // Immediate login - redirect will happen via useEffect
+          console.log('Immediate session available, redirecting...');
         }
       }
     } else {
@@ -54,9 +68,11 @@ function LoginPage() {
       const { data, error } = await signIn(formData.email, formData.password);
 
       if (error) {
+        console.error('Sign in error:', error);
         setError(error.message);
       } else {
-        navigate('/');
+        console.log('Sign in successful:', data);
+        // Redirect will happen via useEffect when auth state changes
       }
     }
   };

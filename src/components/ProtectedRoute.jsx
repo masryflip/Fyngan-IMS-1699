@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('ProtectedRoute state:', { isAuthenticated, loading, user: user?.id });
+  }, [isAuthenticated, loading, user]);
 
   if (loading) {
     return (
@@ -15,16 +20,19 @@ function ProtectedRoute({ children }) {
           className="text-center"
         >
           <div className="w-16 h-16 border-4 border-coffee-200 border-t-coffee-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-coffee-600 font-medium">Loading...</p>
+          <p className="text-coffee-600 font-medium">Loading your dashboard...</p>
+          <p className="text-coffee-500 text-sm mt-2">Setting up your inventory system</p>
         </motion.div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
+    console.log('User not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
+  console.log('User authenticated, rendering protected content');
   return children;
 }
 

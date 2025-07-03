@@ -11,13 +11,16 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Get initial session
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         
-        if (session) {
+        if (session && isMounted) {
+          console.log('Initial session found:', session.user.id);
           setSession(session);
           setIsAuthenticated(true);
           await loadUserProfile(session.user.id);
@@ -25,7 +28,9 @@ export function AuthProvider({ children }) {
       } catch (error) {
         console.error('Error getting initial session:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -36,64 +41,103 @@ export function AuthProvider({ children }) {
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
         
+        if (!isMounted) return;
+
         setSession(session);
         setIsAuthenticated(!!session);
         
         if (session?.user) {
+          setLoading(true);
           await loadUserProfile(session.user.id);
+          setLoading(false);
         } else {
           setUser(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadUserProfile = async (userId) => {
     try {
+      console.log('Loading user profile for:', userId);
+      
       // Try to get existing profile
       let profile = await userService.getProfile(userId);
       
       // If no profile exists, create a basic one
       if (!profile) {
+        console.log('No profile found, creating new profile');
         const { data: authUser } = await supabase.auth.getUser();
-        profile = await userService.updateProfile(userId, {
+        
+        const defaultProfile = {
+          id: userId,
           email: authUser.user?.email || '',
-          name: authUser.user?.user_metadata?.name || authUser.user?.email?.split('@')[0] || 'User',
-          role: 'staff' // Default role
-        });
+          name: authUser.user?.user_metadata?.name || 
+                authUser.user?.email?.split('@')[0] || 
+                'User',
+          role: 'staff',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        profile = await userService.updateProfile(userId, defaultProfile);
+        console.log('Created new profile:', profile);
       }
       
       setUser({
         id: userId,
         ...profile
       });
+      
+      console.log('User profile loaded successfully:', profile);
     } catch (error) {
       console.error('Error loading user profile:', error);
+      
       // Create minimal user object if profile loading fails
-      setUser({
+      const fallbackUser = {
         id: userId,
         email: session?.user?.email || '',
-        name: session?.user?.email?.split('@')[0] || 'User'
-      });
+        name: session?.user?.email?.split('@')[0] || 'User',
+        role: 'staff'
+      };
+      
+      setUser(fallbackUser);
+      console.log('Using fallback user:', fallbackUser);
     }
   };
 
   const signUp = async (email, password, metadata = {}) => {
     try {
       setLoading(true);
+      console.log('Attempting to sign up user:', email);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: metadata
+          data: {
+            name: metadata.name || email.split('@')[0]
+          }
         }
       });
       
       if (error) throw error;
+      
+      console.log('Sign up successful:', data);
+      
+      // If we get a session immediately (email confirmation disabled)
+      if (data.session) {
+        console.log('Immediate session available');
+        setSession(data.session);
+        setIsAuthenticated(true);
+        await loadUserProfile(data.user.id);
+      }
       
       return { data, error: null };
     } catch (error) {
@@ -107,6 +151,8 @@ export function AuthProvider({ children }) {
   const signIn = async (email, password) => {
     try {
       setLoading(true);
+      console.log('Attempting to sign in user:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -114,6 +160,9 @@ export function AuthProvider({ children }) {
       
       if (error) throw error;
       
+      console.log('Sign in successful:', data);
+      
+      // The onAuthStateChange will handle the rest
       return { data, error: null };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -126,6 +175,8 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     try {
       setLoading(true);
+      console.log('Signing out user');
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -134,6 +185,7 @@ export function AuthProvider({ children }) {
       setSession(null);
       setIsAuthenticated(false);
       
+      console.log('Sign out successful');
     } catch (error) {
       console.error('Sign out error:', error);
     } finally {
@@ -145,6 +197,8 @@ export function AuthProvider({ children }) {
     try {
       if (!user?.id) throw new Error('No authenticated user');
       
+      console.log('Updating user profile:', profileData);
+      
       const updatedProfile = await userService.updateProfile(user.id, profileData);
       
       setUser(prev => ({
@@ -152,6 +206,7 @@ export function AuthProvider({ children }) {
         ...updatedProfile
       }));
       
+      console.log('Profile updated successfully:', updatedProfile);
       return updatedProfile;
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -161,8 +216,6 @@ export function AuthProvider({ children }) {
 
   // Legacy compatibility methods
   const login = (userData) => {
-    // This is for compatibility with Quest Login
-    // The actual auth will be handled by Supabase
     console.log('Legacy login called with:', userData);
   };
 

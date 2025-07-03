@@ -160,31 +160,72 @@ export const supplierService = {
 export const itemService = {
   async getAll() {
     try {
-      const { data, error } = await supabase
+      console.log('Fetching all items from database...');
+      
+      // First get items with basic relations
+      const { data: items, error: itemsError } = await supabase
         .from('items_fyngan2024')
         .select(`
           *,
-          category:categories_fyngan2024(id, name, color),
-          supplier:suppliers_fyngan2024(id, name),
-          locations:item_locations_fyngan2024(
-            location_id,
-            quantity,
-            status,
-            last_updated,
-            location:locations_fyngan2024(id, name)
-          )
+          category:category_id(id, name, color),
+          supplier:supplier_id(id, name)
         `)
         .order('name');
       
-      if (error) throw error;
-      return data || [];
+      if (itemsError) {
+        console.error('Error fetching items:', itemsError);
+        throw itemsError;
+      }
+
+      // Then get stock levels for each item
+      const { data: stockLevels, error: stockError } = await supabase
+        .from('item_locations_fyngan2024')
+        .select(`
+          item_id,
+          location_id,
+          quantity,
+          status,
+          last_updated,
+          location:location_id(id, name)
+        `);
+
+      if (stockError) {
+        console.error('Error fetching stock levels:', stockError);
+        // Don't throw error, just use items without stock data
+      }
+
+      // Combine items with their stock levels
+      const itemsWithStock = items.map(item => {
+        const itemStockLevels = stockLevels?.filter(stock => stock.item_id === item.id) || [];
+        
+        // Convert stock levels to locations object
+        const locations = {};
+        itemStockLevels.forEach(stock => {
+          locations[stock.location_id] = {
+            quantity: stock.quantity || 0,
+            status: stock.status || 'out-of-stock',
+            last_updated: stock.last_updated
+          };
+        });
+
+        return {
+          ...item,
+          locations
+        };
+      });
+
+      console.log(`Loaded ${itemsWithStock.length} items with stock data`);
+      return itemsWithStock;
     } catch (error) {
+      console.error('Error in itemService.getAll:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async create(item) {
     try {
+      console.log('Creating new item:', item.name);
+      
       const { data, error } = await supabase
         .from('items_fyngan2024')
         .insert([item])
@@ -192,14 +233,19 @@ export const itemService = {
         .single();
       
       if (error) throw error;
+      
+      console.log('Item created successfully:', data.id);
       return data;
     } catch (error) {
+      console.error('Error creating item:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async update(id, updates) {
     try {
+      console.log('Updating item:', id);
+      
       const { data, error } = await supabase
         .from('items_fyngan2024')
         .update(updates)
@@ -208,41 +254,55 @@ export const itemService = {
         .single();
       
       if (error) throw error;
+      
+      console.log('Item updated successfully:', id);
       return data;
     } catch (error) {
+      console.error('Error updating item:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async delete(id) {
     try {
+      console.log('Deleting item:', id);
+      
       const { error } = await supabase
         .from('items_fyngan2024')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
+      
+      console.log('Item deleted successfully:', id);
       return true;
     } catch (error) {
+      console.error('Error deleting item:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async updateStock(itemId, locationId, quantity, reason = null) {
     try {
+      console.log('Updating stock:', { itemId, locationId, quantity });
+      
       const { data, error } = await supabase
         .from('item_locations_fyngan2024')
         .upsert({
           item_id: itemId,
           location_id: locationId,
-          quantity: quantity
+          quantity: quantity,
+          last_updated: new Date().toISOString()
         })
         .select()
         .single();
       
       if (error) throw error;
+      
+      console.log('Stock updated successfully');
       return data;
     } catch (error) {
+      console.error('Error updating stock:', error);
       throw new Error(handleSupabaseError(error));
     }
   }
@@ -252,65 +312,90 @@ export const itemService = {
 export const orderService = {
   async getAll() {
     try {
+      console.log('Fetching all orders...');
+      
       const { data, error } = await supabase
         .from('orders_fyngan2024')
         .select(`
           *,
-          item:items_fyngan2024(id, name, unit),
-          location:locations_fyngan2024(id, name),
-          supplier:suppliers_fyngan2024(id, name),
-          creator:users_fyngan2024(id, name)
+          item:item_id(id, name, unit),
+          location:location_id(id, name),
+          supplier:supplier_id(id, name)
         `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+      
+      console.log(`Loaded ${data?.length || 0} orders`);
       return data || [];
     } catch (error) {
+      console.error('Error fetching orders:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async create(order) {
     try {
+      console.log('Creating new order:', order);
+      
       const { data, error } = await supabase
         .from('orders_fyngan2024')
-        .insert([order])
+        .insert([{
+          ...order,
+          created_at: new Date().toISOString()
+        }])
         .select()
         .single();
       
       if (error) throw error;
+      
+      console.log('Order created successfully:', data.id);
       return data;
     } catch (error) {
+      console.error('Error creating order:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async update(id, updates) {
     try {
+      console.log('Updating order:', id);
+      
       const { data, error } = await supabase
         .from('orders_fyngan2024')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
         .single();
       
       if (error) throw error;
+      
+      console.log('Order updated successfully:', id);
       return data;
     } catch (error) {
+      console.error('Error updating order:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async delete(id) {
     try {
+      console.log('Deleting order:', id);
+      
       const { error } = await supabase
         .from('orders_fyngan2024')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
+      
+      console.log('Order deleted successfully:', id);
       return true;
     } catch (error) {
+      console.error('Error deleting order:', error);
       throw new Error(handleSupabaseError(error));
     }
   }
@@ -320,57 +405,79 @@ export const orderService = {
 export const transferService = {
   async getAll() {
     try {
+      console.log('Fetching all transfers...');
+      
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
         .select(`
           *,
-          item:items_fyngan2024(id, name, unit),
-          from_location:from_location_id(locations_fyngan2024!transfers_fyngan2024_from_location_id_fkey(id, name)),
-          to_location:to_location_id(locations_fyngan2024!transfers_fyngan2024_to_location_id_fkey(id, name)),
-          creator:users_fyngan2024(id, name)
+          item:item_id(id, name, unit),
+          from_location:from_location_id(id, name),
+          to_location:to_location_id(id, name)
         `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+      
+      console.log(`Loaded ${data?.length || 0} transfers`);
       return data || [];
     } catch (error) {
+      console.error('Error fetching transfers:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async create(transfer) {
     try {
+      console.log('Creating new transfer:', transfer);
+      
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
-        .insert([transfer])
+        .insert([{
+          ...transfer,
+          created_at: new Date().toISOString()
+        }])
         .select()
         .single();
       
       if (error) throw error;
+      
+      console.log('Transfer created successfully:', data.id);
       return data;
     } catch (error) {
+      console.error('Error creating transfer:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async update(id, updates) {
     try {
+      console.log('Updating transfer:', id);
+      
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
         .single();
       
       if (error) throw error;
+      
+      console.log('Transfer updated successfully:', id);
       return data;
     } catch (error) {
+      console.error('Error updating transfer:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async complete(id) {
     try {
+      console.log('Completing transfer:', id);
+      
       // Get transfer details
       const { data: transfer, error: fetchError } = await supabase
         .from('transfers_fyngan2024')
@@ -380,31 +487,84 @@ export const transferService = {
       
       if (fetchError) throw fetchError;
 
-      // Update stock levels
-      const { error: updateError } = await supabase.rpc('complete_transfer', {
-        transfer_id: id,
-        item_id: transfer.item_id,
-        from_location: transfer.from_location_id,
-        to_location: transfer.to_location_id,
-        quantity: transfer.quantity
-      });
+      // Update stock levels manually (since we don't have the RPC function)
+      const { data: fromStock, error: fromError } = await supabase
+        .from('item_locations_fyngan2024')
+        .select('quantity')
+        .eq('item_id', transfer.item_id)
+        .eq('location_id', transfer.from_location_id)
+        .single();
 
-      if (updateError) throw updateError;
+      if (fromError && fromError.code !== 'PGRST116') throw fromError;
+
+      const { data: toStock, error: toError } = await supabase
+        .from('item_locations_fyngan2024')
+        .select('quantity')
+        .eq('item_id', transfer.item_id)
+        .eq('location_id', transfer.to_location_id)
+        .single();
+
+      if (toError && toError.code !== 'PGRST116') throw toError;
+
+      // Update from location (subtract)
+      const newFromQuantity = Math.max(0, (fromStock?.quantity || 0) - transfer.quantity);
+      await supabase
+        .from('item_locations_fyngan2024')
+        .upsert({
+          item_id: transfer.item_id,
+          location_id: transfer.from_location_id,
+          quantity: newFromQuantity,
+          last_updated: new Date().toISOString()
+        });
+
+      // Update to location (add)
+      const newToQuantity = (toStock?.quantity || 0) + transfer.quantity;
+      await supabase
+        .from('item_locations_fyngan2024')
+        .upsert({
+          item_id: transfer.item_id,
+          location_id: transfer.to_location_id,
+          quantity: newToQuantity,
+          last_updated: new Date().toISOString()
+        });
 
       // Mark transfer as completed
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
         .update({ 
           status: 'completed',
-          completed_date: new Date().toISOString().split('T')[0]
+          completed_date: new Date().toISOString().split('T')[0],
+          updated_at: new Date().toISOString()
         })
         .eq('id', id)
         .select()
         .single();
       
       if (error) throw error;
+      
+      console.log('Transfer completed successfully:', id);
       return data;
     } catch (error) {
+      console.error('Error completing transfer:', error);
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async delete(id) {
+    try {
+      console.log('Deleting transfer:', id);
+      
+      const { error } = await supabase
+        .from('transfers_fyngan2024')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      console.log('Transfer deleted successfully:', id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting transfer:', error);
       throw new Error(handleSupabaseError(error));
     }
   }
@@ -414,6 +574,8 @@ export const transferService = {
 export const userService = {
   async getProfile(userId) {
     try {
+      console.log('Fetching user profile for:', userId);
+      
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .select('*')
@@ -421,14 +583,19 @@ export const userService = {
         .single();
       
       if (error && error.code !== 'PGRST116') throw error;
+      
+      console.log('User profile fetched:', data ? 'found' : 'not found');
       return data;
     } catch (error) {
+      console.error('Error fetching user profile:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async updateProfile(userId, profile) {
     try {
+      console.log('Updating user profile for:', userId);
+      
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .upsert({
@@ -440,22 +607,30 @@ export const userService = {
         .single();
       
       if (error) throw error;
+      
+      console.log('User profile updated successfully');
       return data;
     } catch (error) {
+      console.error('Error updating user profile:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async getAll() {
     try {
+      console.log('Fetching all users...');
+      
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .select('*')
         .order('name');
       
       if (error) throw error;
+      
+      console.log(`Loaded ${data?.length || 0} users`);
       return data || [];
     } catch (error) {
+      console.error('Error fetching users:', error);
       throw new Error(handleSupabaseError(error));
     }
   }
@@ -463,55 +638,91 @@ export const userService = {
 
 // Real-time subscriptions
 export const subscribeToTable = (tableName, callback) => {
-  const subscription = supabase
-    .channel(`${tableName}_changes`)
-    .on('postgres_changes', 
-      { 
-        event: '*', 
-        schema: 'public', 
-        table: tableName 
-      }, 
-      callback
-    )
-    .subscribe();
+  try {
+    console.log('Setting up subscription for table:', tableName);
+    
+    const subscription = supabase
+      .channel(`${tableName}_changes`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: tableName 
+        }, 
+        (payload) => {
+          console.log('Real-time update received for', tableName, ':', payload);
+          callback(payload);
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status for', tableName, ':', status);
+      });
 
-  return subscription;
+    return subscription;
+  } catch (error) {
+    console.error('Error setting up subscription for', tableName, ':', error);
+    return null;
+  }
 };
 
 // Analytics and Reports
 export const analyticsService = {
   async getInventoryValue() {
     try {
-      const { data, error } = await supabase
-        .rpc('get_inventory_value_by_category');
+      console.log('Fetching inventory value data...');
       
-      if (error) throw error;
-      return data || [];
+      // Since we don't have the RPC function, calculate manually
+      const items = await itemService.getAll();
+      const categoryValues = {};
+      
+      items.forEach(item => {
+        const categoryName = item.category?.name || 'Uncategorized';
+        const totalQuantity = Object.values(item.locations).reduce((sum, loc) => sum + (loc.quantity || 0), 0);
+        const itemValue = totalQuantity * (item.cost || 0);
+        
+        categoryValues[categoryName] = (categoryValues[categoryName] || 0) + itemValue;
+      });
+      
+      const result = Object.entries(categoryValues).map(([category, value]) => ({
+        category,
+        value
+      }));
+      
+      console.log('Inventory value calculated:', result);
+      return result;
     } catch (error) {
+      console.error('Error calculating inventory value:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async getLowStockItems() {
     try {
+      console.log('Fetching low stock items...');
+      
       const { data, error } = await supabase
         .from('item_locations_fyngan2024')
         .select(`
           *,
-          item:items_fyngan2024(id, name, min_stock, unit),
-          location:locations_fyngan2024(id, name)
+          item:item_id(id, name, min_stock, unit),
+          location:location_id(id, name)
         `)
         .in('status', ['low-stock', 'out-of-stock']);
       
       if (error) throw error;
+      
+      console.log(`Found ${data?.length || 0} low stock items`);
       return data || [];
     } catch (error) {
+      console.error('Error fetching low stock items:', error);
       throw new Error(handleSupabaseError(error));
     }
   },
 
   async getExpiringItems(days = 30) {
     try {
+      console.log('Fetching expiring items...');
+      
       const { data, error } = await supabase
         .from('items_fyngan2024')
         .select(`
@@ -519,15 +730,18 @@ export const analyticsService = {
           locations:item_locations_fyngan2024(
             location_id,
             quantity,
-            location:locations_fyngan2024(name)
+            location:location_id(name)
           )
         `)
         .lte('expiry_date', new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString())
         .gte('expiry_date', new Date().toISOString());
       
       if (error) throw error;
+      
+      console.log(`Found ${data?.length || 0} expiring items`);
       return data || [];
     } catch (error) {
+      console.error('Error fetching expiring items:', error);
       throw new Error(handleSupabaseError(error));
     }
   }
