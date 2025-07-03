@@ -176,42 +176,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const signUp = async (email, password, metadata = {}) => {
-    try {
-      setLoading(true);
-      console.log('Attempting to sign up user:', email);
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: metadata.name || email.split('@')[0]
-          }
-        }
-      });
-      
-      if (error) throw error;
-      
-      console.log('Sign up successful:', data);
-      
-      // If we get a session immediately (email confirmation disabled)
-      if (data.session) {
-        console.log('Immediate session available');
-        setSession(data.session);
-        setIsAuthenticated(true);
-        await loadUserProfile(data.user.id);
-      }
-      
-      return { data, error: null };
-    } catch (error) {
-      console.error('Sign up error:', error);
-      return { data: null, error };
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signIn = async (email, password) => {
     try {
       setLoading(true);
@@ -294,8 +258,7 @@ export function AuthProvider({ children }) {
     session,
     loading,
 
-    // Methods
-    signUp,
+    // Methods - removed signUp
     signIn,
     signOut,
     updateUserProfile,

@@ -9,14 +9,11 @@ const { FiCoffee, FiShield, FiTrendingUp, FiUsers, FiMail, FiLock, FiEye, FiEyeO
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, signUp, loading, isAuthenticated, user } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const { signIn, loading, isAuthenticated, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    confirmPassword: '',
-    name: ''
+    password: ''
   });
   const [error, setError] = useState('');
 
@@ -31,49 +28,17 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    console.log('Form submitted:', { email: formData.email });
 
-    console.log('Form submitted:', { isSignUp, email: formData.email });
-
-    if (isSignUp) {
-      // Sign up validation
-      if (formData.password !== formData.confirmPassword) {
-        setError('Passwords do not match');
-        return;
-      }
-      if (formData.password.length < 6) {
-        setError('Password must be at least 6 characters');
-        return;
-      }
-
-      const { data, error } = await signUp(formData.email, formData.password, {
-        name: formData.name
-      });
-
-      if (error) {
-        console.error('Sign up error:', error);
-        setError(error.message);
-      } else {
-        console.log('Sign up successful:', data);
-        
-        // Check if email confirmation is required
-        if (data.user && !data.session) {
-          setError('Please check your email to confirm your account');
-        } else if (data.session) {
-          // Immediate login - redirect will happen via useEffect
-          console.log('Immediate session available, redirecting...');
-        }
-      }
+    const { data, error } = await signIn(formData.email, formData.password);
+    
+    if (error) {
+      console.error('Sign in error:', error);
+      setError(error.message);
     } else {
-      // Sign in
-      const { data, error } = await signIn(formData.email, formData.password);
-
-      if (error) {
-        console.error('Sign in error:', error);
-        setError(error.message);
-      } else {
-        console.log('Sign in successful:', data);
-        // Redirect will happen via useEffect when auth state changes
-      }
+      console.log('Sign in successful:', data);
+      // Redirect will happen via useEffect when auth state changes
     }
   };
 
@@ -82,6 +47,7 @@ function LoginPage() {
       ...prev,
       [field]: value
     }));
+    
     // Clear error when user starts typing
     if (error) setError('');
   };
@@ -147,21 +113,18 @@ function LoginPage() {
                 <p className="text-white/80 text-sm">Inventory Management System</p>
               </div>
             </div>
-            
+
             <h2 className="text-4xl font-bold mb-4 leading-tight">
-              {isSignUp ? 'Join Fyngan IMS' : 'Welcome Back to Your'}
+              Welcome Back to Your
               <span className="block bg-gradient-to-r from-white to-coffee-100 bg-clip-text text-transparent">
-                {isSignUp ? 'Team' : 'Inventory Hub'}
+                Inventory Hub
               </span>
             </h2>
             
             <p className="text-xl text-white/90 mb-12 leading-relaxed">
-              {isSignUp 
-                ? 'Create your account and start managing inventory across multiple locations with powerful analytics and real-time tracking.'
-                : 'Streamline your inventory management across multiple locations with powerful analytics and real-time tracking.'
-              }
+              Streamline your inventory management across multiple locations with powerful analytics and real-time tracking.
             </p>
-            
+
             <div className="grid grid-cols-1 gap-6">
               {features.map((feature, index) => (
                 <motion.div
@@ -185,7 +148,7 @@ function LoginPage() {
         </div>
       </div>
 
-      {/* Right Section - Login/Signup Form */}
+      {/* Right Section - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -218,14 +181,9 @@ function LoginPage() {
           </div>
 
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              {isSignUp ? 'Create Account' : 'Sign In'}
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
             <p className="text-gray-600">
-              {isSignUp 
-                ? 'Join your team and start managing inventory' 
-                : 'Access your inventory management dashboard'
-              }
+              Access your inventory management dashboard
             </p>
           </div>
 
@@ -237,31 +195,15 @@ function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {isSignUp && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <SafeIcon icon={FiUsers} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email Address
                 </label>
                 <div className="relative">
-                  <SafeIcon icon={FiMail} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <SafeIcon 
+                    icon={FiMail} 
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" 
+                  />
                   <input
                     type="email"
                     required
@@ -278,14 +220,17 @@ function LoginPage() {
                   Password
                 </label>
                 <div className="relative">
-                  <SafeIcon icon={FiLock} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <SafeIcon 
+                    icon={FiLock} 
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" 
+                  />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
-                    placeholder={isSignUp ? 'Create password (min 6 characters)' : 'Enter your password'}
+                    placeholder="Enter your password"
                   />
                   <button
                     type="button"
@@ -297,25 +242,6 @@ function LoginPage() {
                 </div>
               </div>
 
-              {isSignUp && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirm Password
-                  </label>
-                  <div className="relative">
-                    <SafeIcon icon={FiLock} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={formData.confirmPassword}
-                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
-                      placeholder="Confirm your password"
-                    />
-                  </div>
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={loading}
@@ -324,29 +250,25 @@ function LoginPage() {
                 {loading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
+                    <span>Signing In...</span>
                   </>
                 ) : (
-                  <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                  <span>Sign In</span>
                 )}
               </button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-                <button
-                  onClick={() => {
-                    setIsSignUp(!isSignUp);
-                    setError('');
-                    setFormData({ email: '', password: '', confirmPassword: '', name: '' });
-                  }}
-                  className="ml-1 text-coffee-600 hover:text-coffee-700 font-medium"
-                  disabled={loading}
-                >
-                  {isSignUp ? 'Sign In' : 'Create Account'}
-                </button>
+            {/* Account Request Information */}
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">Need an Account?</h4>
+              <p className="text-sm text-blue-800 mb-3">
+                Accounts are created and managed by your system administrator.
               </p>
+              <div className="text-xs text-blue-700 space-y-1">
+                <p>• Contact your IT administrator for account creation</p>
+                <p>• Provide your email address and required access level</p>
+                <p>• You'll receive login credentials once your account is set up</p>
+              </div>
             </div>
           </div>
 
