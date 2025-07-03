@@ -1,18 +1,40 @@
 import { supabase, handleSupabaseError } from '../lib/supabase';
 
+// Connection test helper
+const testConnection = async () => {
+  try {
+    const { error } = await supabase.from('users_fyngan2024').select('count(*)').limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
+};
+
 // Locations Service
 export const locationService = {
   async getAll() {
     try {
+      console.log('Fetching locations...');
+      
+      // Test connection first
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty locations');
+        return [];
+      }
+      
       const { data, error } = await supabase
         .from('locations_fyngan2024')
         .select('*')
         .order('name');
       
       if (error) throw error;
+      
+      console.log(`Loaded ${data?.length || 0} locations`);
       return data || [];
     } catch (error) {
-      throw new Error(handleSupabaseError(error));
+      console.error('Error in locationService.getAll:', error);
+      return []; // Return empty array instead of throwing
     }
   },
 
@@ -66,15 +88,26 @@ export const locationService = {
 export const categoryService = {
   async getAll() {
     try {
+      console.log('Fetching categories...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty categories');
+        return [];
+      }
+      
       const { data, error } = await supabase
         .from('categories_fyngan2024')
         .select('*')
         .order('name');
       
       if (error) throw error;
+      
+      console.log(`Loaded ${data?.length || 0} categories`);
       return data || [];
     } catch (error) {
-      throw new Error(handleSupabaseError(error));
+      console.error('Error in categoryService.getAll:', error);
+      return [];
     }
   },
 
@@ -128,15 +161,26 @@ export const categoryService = {
 export const supplierService = {
   async getAll() {
     try {
+      console.log('Fetching suppliers...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty suppliers');
+        return [];
+      }
+      
       const { data, error } = await supabase
         .from('suppliers_fyngan2024')
         .select('*')
         .order('name');
       
       if (error) throw error;
+      
+      console.log(`Loaded ${data?.length || 0} suppliers`);
       return data || [];
     } catch (error) {
-      throw new Error(handleSupabaseError(error));
+      console.error('Error in supplierService.getAll:', error);
+      return [];
     }
   },
 
@@ -160,7 +204,13 @@ export const supplierService = {
 export const itemService = {
   async getAll() {
     try {
-      console.log('Fetching all items from database...');
+      console.log('Fetching items...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty items');
+        return [];
+      }
       
       // First get items with basic relations
       const { data: items, error: itemsError } = await supabase
@@ -174,7 +224,7 @@ export const itemService = {
       
       if (itemsError) {
         console.error('Error fetching items:', itemsError);
-        throw itemsError;
+        return [];
       }
 
       // Then get stock levels for each item
@@ -190,12 +240,12 @@ export const itemService = {
         `);
 
       if (stockError) {
-        console.error('Error fetching stock levels:', stockError);
-        // Don't throw error, just use items without stock data
+        console.warn('Error fetching stock levels:', stockError);
+        // Continue without stock data
       }
 
       // Combine items with their stock levels
-      const itemsWithStock = items.map(item => {
+      const itemsWithStock = (items || []).map(item => {
         const itemStockLevels = stockLevels?.filter(stock => stock.item_id === item.id) || [];
         
         // Convert stock levels to locations object
@@ -218,7 +268,7 @@ export const itemService = {
       return itemsWithStock;
     } catch (error) {
       console.error('Error in itemService.getAll:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   },
 
@@ -312,7 +362,13 @@ export const itemService = {
 export const orderService = {
   async getAll() {
     try {
-      console.log('Fetching all orders...');
+      console.log('Fetching orders...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty orders');
+        return [];
+      }
       
       const { data, error } = await supabase
         .from('orders_fyngan2024')
@@ -330,7 +386,7 @@ export const orderService = {
       return data || [];
     } catch (error) {
       console.error('Error fetching orders:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   },
 
@@ -405,7 +461,13 @@ export const orderService = {
 export const transferService = {
   async getAll() {
     try {
-      console.log('Fetching all transfers...');
+      console.log('Fetching transfers...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty transfers');
+        return [];
+      }
       
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
@@ -423,7 +485,7 @@ export const transferService = {
       return data || [];
     } catch (error) {
       console.error('Error fetching transfers:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   },
 
@@ -576,6 +638,12 @@ export const userService = {
     try {
       console.log('Fetching user profile for:', userId);
       
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning null profile');
+        return null;
+      }
+      
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .select('*')
@@ -588,7 +656,7 @@ export const userService = {
       return data;
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      throw new Error(handleSupabaseError(error));
+      return null; // Return null instead of throwing
     }
   },
 
@@ -620,6 +688,12 @@ export const userService = {
     try {
       console.log('Fetching all users...');
       
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        console.warn('Database not accessible, returning empty users');
+        return [];
+      }
+      
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .select('*')
@@ -631,7 +705,7 @@ export const userService = {
       return data || [];
     } catch (error) {
       console.error('Error fetching users:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   }
 };
@@ -651,7 +725,9 @@ export const subscribeToTable = (tableName, callback) => {
         }, 
         (payload) => {
           console.log('Real-time update received for', tableName, ':', payload);
-          callback(payload);
+          if (callback && typeof callback === 'function') {
+            callback(payload);
+          }
         }
       )
       .subscribe((status) => {
@@ -692,13 +768,18 @@ export const analyticsService = {
       return result;
     } catch (error) {
       console.error('Error calculating inventory value:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   },
 
   async getLowStockItems() {
     try {
       console.log('Fetching low stock items...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        return [];
+      }
       
       const { data, error } = await supabase
         .from('item_locations_fyngan2024')
@@ -715,13 +796,18 @@ export const analyticsService = {
       return data || [];
     } catch (error) {
       console.error('Error fetching low stock items:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   },
 
   async getExpiringItems(days = 30) {
     try {
       console.log('Fetching expiring items...');
+      
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        return [];
+      }
       
       const { data, error } = await supabase
         .from('items_fyngan2024')
@@ -742,7 +828,7 @@ export const analyticsService = {
       return data || [];
     } catch (error) {
       console.error('Error fetching expiring items:', error);
-      throw new Error(handleSupabaseError(error));
+      return [];
     }
   }
 };

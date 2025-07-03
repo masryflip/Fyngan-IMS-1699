@@ -3,7 +3,7 @@ import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { SupabaseInventoryProvider } from './context/SupabaseInventoryContext';
+import { InventoryProvider } from './context/InventoryContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import Header from './components/Header';
@@ -33,9 +33,12 @@ function AppContent() {
   }, []);
 
   return (
-    <SupabaseInventoryProvider>
+    <InventoryProvider>
       <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-hidden transition-colors duration-300">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar 
+          isOpen={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)} 
+        />
         
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header onMenuClick={() => setSidebarOpen(true)} />
@@ -61,7 +64,7 @@ function AppContent() {
           </main>
         </div>
       </div>
-    </SupabaseInventoryProvider>
+    </InventoryProvider>
   );
 }
 

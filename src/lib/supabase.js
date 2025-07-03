@@ -23,20 +23,52 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error) => {
   console.error('Supabase error:', error);
+  
   if (error?.message) {
     return error.message;
   }
+  
   return 'An unexpected error occurred';
 };
 
 // Helper function to check if user is authenticated
 export const checkAuth = async () => {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error) {
-    console.error('Auth check error:', error);
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Auth check error:', error);
+      return null;
+    }
+    
+    return session;
+  } catch (error) {
+    console.error('Auth check failed:', error);
     return null;
   }
-  return session;
+};
+
+// Test connection function
+export const testConnection = async () => {
+  try {
+    console.log('Testing Supabase connection...');
+    
+    const { data, error } = await supabase
+      .from('users_fyngan2024')
+      .select('count(*)')
+      .limit(1);
+    
+    if (error) {
+      console.error('Connection test failed:', error);
+      return false;
+    }
+    
+    console.log('Supabase connection successful');
+    return true;
+  } catch (error) {
+    console.error('Connection test error:', error);
+    return false;
+  }
 };
 
 export default supabase;

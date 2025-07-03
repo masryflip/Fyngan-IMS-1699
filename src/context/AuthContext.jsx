@@ -12,24 +12,47 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId;
+
+    // Set a maximum loading time of 10 seconds
+    timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('Authentication check timed out, proceeding with no auth');
+        setLoading(false);
+        setIsAuthenticated(false);
+        setUser(null);
+        setSession(null);
+      }
+    }, 10000);
 
     // Get initial session
     const getInitialSession = async () => {
       try {
+        console.log('Checking for existing session...');
+        
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          throw error;
+        }
         
         if (session && isMounted) {
-          console.log('Initial session found:', session.user.id);
+          console.log('Found existing session for user:', session.user.id);
           setSession(session);
           setIsAuthenticated(true);
           await loadUserProfile(session.user.id);
+        } else {
+          console.log('No existing session found');
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
+        // Don't throw, just continue without auth
       } finally {
         if (isMounted) {
+          console.log('Setting loading to false');
           setLoading(false);
+          if (timeoutId) clearTimeout(timeoutId);
         }
       }
     };
@@ -48,7 +71,18 @@ export function AuthProvider({ children }) {
         
         if (session?.user) {
           setLoading(true);
-          await loadUserProfile(session.user.id);
+          try {
+            await loadUserProfile(session.user.id);
+          } catch (error) {
+            console.error('Error loading user profile during auth change:', error);
+            // Create a basic user object as fallback
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.email?.split('@')[0] || 'User',
+              role: 'staff'
+            });
+          }
           setLoading(false);
         } else {
           setUser(null);
@@ -59,6 +93,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
@@ -67,27 +102,56 @@ export function AuthProvider({ children }) {
     try {
       console.log('Loading user profile for:', userId);
       
-      // Try to get existing profile
-      let profile = await userService.getProfile(userId);
+      // Try to get existing profile with timeout
+      const profilePromise = userService.getProfile(userId);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile loading timeout')), 5000)
+      );
       
-      // If no profile exists, create a basic one
+      let profile;
+      try {
+        profile = await Promise.race([profilePromise, timeoutPromise]);
+      } catch (error) {
+        console.warn('Profile loading failed or timed out:', error);
+        profile = null;
+      }
+      
+      // If no profile exists or loading failed, create a basic one
       if (!profile) {
-        console.log('No profile found, creating new profile');
-        const { data: authUser } = await supabase.auth.getUser();
+        console.log('Creating basic user profile...');
         
-        const defaultProfile = {
-          id: userId,
-          email: authUser.user?.email || '',
-          name: authUser.user?.user_metadata?.name || 
-                authUser.user?.email?.split('@')[0] || 
-                'User',
-          role: 'staff',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        profile = await userService.updateProfile(userId, defaultProfile);
-        console.log('Created new profile:', profile);
+        try {
+          const { data: authUser } = await supabase.auth.getUser();
+          
+          const defaultProfile = {
+            id: userId,
+            email: authUser.user?.email || '',
+            name: authUser.user?.user_metadata?.name || 
+                  authUser.user?.email?.split('@')[0] || 
+                  'User',
+            role: 'staff',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          // Try to create profile in database, but don't fail if it doesn't work
+          try {
+            profile = await userService.updateProfile(userId, defaultProfile);
+            console.log('Created new profile in database:', profile);
+          } catch (dbError) {
+            console.warn('Failed to create profile in database, using local profile:', dbError);
+            profile = defaultProfile;
+          }
+        } catch (authError) {
+          console.error('Failed to get auth user data:', authError);
+          // Use minimal profile
+          profile = {
+            id: userId,
+            email: 'user@example.com',
+            name: 'User',
+            role: 'staff'
+          };
+        }
       }
       
       setUser({
@@ -99,10 +163,10 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Error loading user profile:', error);
       
-      // Create minimal user object if profile loading fails
+      // Create minimal user object as final fallback
       const fallbackUser = {
         id: userId,
-        email: session?.user?.email || '',
+        email: session?.user?.email || 'user@example.com',
         name: session?.user?.email?.split('@')[0] || 'User',
         role: 'staff'
       };
