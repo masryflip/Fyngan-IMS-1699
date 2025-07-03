@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Fyngan Inventory Management System - Multi-location inventory tracking and management",
+  "description": "Fyngan Inventory Management System - Multi-location inventory tracking and management with Supabase backend",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,7 +12,7 @@
     "deploy": "npm run build && echo 'Build completed! Upload the dist folder to your web server.'"
   },
   "dependencies": {
-    "@questlabs/react-sdk": "^2.1.9",
+    "@supabase/supabase-js": "^2.39.0",
     "react": "^18.3.1",
     "react-router-dom": "^7.1.0",
     "react-dom": "^18.3.1",
@@ -40,7 +40,10 @@
     "stock-tracking",
     "business-management",
     "react",
-    "vite"
+    "vite",
+    "supabase",
+    "real-time",
+    "database"
   ],
   "author": "Your Company Name",
   "license": "MIT"

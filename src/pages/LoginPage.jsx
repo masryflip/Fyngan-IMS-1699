@@ -1,32 +1,73 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { QuestLogin } from '@questlabs/react-sdk';
 import { useAuth } from '../context/AuthContext';
-import questConfig from '../config/questConfig';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiCoffee, FiShield, FiTrendingUp, FiUsers } = FiIcons;
+const { FiCoffee, FiShield, FiTrendingUp, FiUsers, FiMail, FiLock, FiEye, FiEyeOff } = FiIcons;
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signIn, signUp, loading } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    name: ''
+  });
+  const [error, setError] = useState('');
 
-  const handleLogin = ({ userId, token, newUser }) => {
-    const userData = {
-      userId,
-      token,
-      newUser
-    };
-    
-    login(userData);
-    
-    if (newUser) {
-      navigate('/onboarding');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (isSignUp) {
+      // Sign up validation
+      if (formData.password !== formData.confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (formData.password.length < 6) {
+        setError('Password must be at least 6 characters');
+        return;
+      }
+
+      const { data, error } = await signUp(formData.email, formData.password, {
+        name: formData.name
+      });
+
+      if (error) {
+        setError(error.message);
+      } else {
+        // Check if email confirmation is required
+        if (data.user && !data.session) {
+          setError('Please check your email to confirm your account');
+        } else {
+          navigate('/');
+        }
+      }
     } else {
-      navigate('/');
+      // Sign in
+      const { data, error } = await signIn(formData.email, formData.password);
+
+      if (error) {
+        setError(error.message);
+      } else {
+        navigate('/');
+      }
     }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
   const features = [
@@ -63,7 +104,7 @@ function LoginPage() {
         <div className="absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
         <div className="absolute bottom-20 right-20 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
         <div className="absolute top-1/2 left-1/3 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
-
+        
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -90,18 +131,21 @@ function LoginPage() {
                 <p className="text-white/80 text-sm">Inventory Management System</p>
               </div>
             </div>
-
+            
             <h2 className="text-4xl font-bold mb-4 leading-tight">
-              Welcome Back to Your
+              {isSignUp ? 'Join Fyngan IMS' : 'Welcome Back to Your'}
               <span className="block bg-gradient-to-r from-white to-coffee-100 bg-clip-text text-transparent">
-                Inventory Hub
+                {isSignUp ? 'Team' : 'Inventory Hub'}
               </span>
             </h2>
             
             <p className="text-xl text-white/90 mb-12 leading-relaxed">
-              Streamline your inventory management across multiple locations with powerful analytics and real-time tracking.
+              {isSignUp 
+                ? 'Create your account and start managing inventory across multiple locations with powerful analytics and real-time tracking.'
+                : 'Streamline your inventory management across multiple locations with powerful analytics and real-time tracking.'
+              }
             </p>
-
+            
             <div className="grid grid-cols-1 gap-6">
               {features.map((feature, index) => (
                 <motion.div
@@ -125,7 +169,7 @@ function LoginPage() {
         </div>
       </div>
 
-      {/* Right Section - Login Form */}
+      {/* Right Section - Login/Signup Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -158,26 +202,141 @@ function LoginPage() {
           </div>
 
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
-            <p className="text-gray-600">Access your inventory management dashboard</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              {isSignUp ? 'Create Account' : 'Sign In'}
+            </h2>
+            <p className="text-gray-600">
+              {isSignUp 
+                ? 'Join your team and start managing inventory' 
+                : 'Access your inventory management dashboard'
+              }
+            </p>
           </div>
 
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8">
-            <QuestLogin
-              onSubmit={handleLogin}
-              email={true}
-              google={false}
-              accent={questConfig.PRIMARY_COLOR}
-              style={{
-                width: '100%',
-                minHeight: '400px'
-              }}
-            />
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {isSignUp && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <SafeIcon icon={FiUsers} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <SafeIcon icon={FiMail} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
+                    placeholder="Enter your email"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <SafeIcon icon={FiLock} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
+                    placeholder={isSignUp ? 'Create password (min 6 characters)' : 'Enter your password'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <SafeIcon icon={showPassword ? FiEyeOff : FiEye} className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {isSignUp && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <SafeIcon icon={FiLock} className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
+                      placeholder="Confirm your password"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center space-x-2 py-3 bg-coffee-500 text-white rounded-lg hover:bg-coffee-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
+                  </>
+                ) : (
+                  <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+                <button
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setError('');
+                    setFormData({ email: '', password: '', confirmPassword: '', name: '' });
+                  }}
+                  className="ml-1 text-coffee-600 hover:text-coffee-700 font-medium"
+                  disabled={loading}
+                >
+                  {isSignUp ? 'Sign In' : 'Create Account'}
+                </button>
+              </p>
+            </div>
           </div>
 
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-500">
-              New to Fyngan IMS? Your account will be created automatically upon first login.
+              Secure authentication powered by Supabase
             </p>
           </div>
         </motion.div>
