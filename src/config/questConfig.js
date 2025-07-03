@@ -1,0 +1,10 @@
+const questConfig = {
+  QUEST_ONBOARDING_QUESTID: 'c-greta-onboarding',
+  USER_ID: 'u-a04918d2-1b54-438d-b1df-5dc57389fd0d',
+  APIKEY: 'k-bdb3004b-284e-48fa-b2a8-864b702dbed9',
+  TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1LWEwNDkxOGQyLTFiNTQtNDM4ZC1iMWRmLTVkYzU3Mzg5ZmQwZCIsImlhdCI6MTc1MTU1NzczOSwiZXhwIjoxNzU0MTQ5NzM5fQ.fnJ4S2v6KPJEq-Gp-cZebU3H2NclZDPGB74qJIuKFYo',
+  ENTITYID: 'e-ee65360a-fcb5-40a3-919e-69457c3e50a4',
+  PRIMARY_COLOR: '#d2691e'
+};
+
+export default questConfig;
