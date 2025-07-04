@@ -5,17 +5,19 @@ import { useAuth } from '../context/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiCoffee, FiShield, FiTrendingUp, FiUsers, FiMail, FiLock, FiEye, FiEyeOff } = FiIcons;
+const { FiCoffee, FiShield, FiTrendingUp, FiUsers, FiMail, FiLock, FiEye, FiEyeOff, FiInfo } = FiIcons;
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, loading, isAuthenticated, user } = useAuth();
+  const { signIn, loading, isAuthenticated, user, debugInfo, forceLogin } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
-    password: ''
+    email: 'test@example.com', // Pre-fill for easier testing
+    password: 'password123'
   });
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -28,17 +30,31 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
     
     console.log('Form submitted:', { email: formData.email });
 
-    const { data, error } = await signIn(formData.email, formData.password);
-    
-    if (error) {
-      console.error('Sign in error:', error);
-      setError(error.message);
-    } else {
-      console.log('Sign in successful:', data);
-      // Redirect will happen via useEffect when auth state changes
+    try {
+      const { data, error } = await signIn(formData.email, formData.password);
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        setError(error.message);
+        setIsSubmitting(false);
+      } else {
+        console.log('Sign in successful:', data);
+        // Wait a moment for auth state to update, then redirect
+        setTimeout(() => {
+          if (!isAuthenticated) {
+            console.log('Forcing redirect to dashboard');
+            navigate('/', { replace: true });
+          }
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Unexpected error during sign in:', err);
+      setError('An unexpected error occurred. Please try again.');
+      setIsSubmitting(false);
     }
   };
 
@@ -50,6 +66,13 @@ function LoginPage() {
     
     // Clear error when user starts typing
     if (error) setError('');
+  };
+
+  const handleTestLogin = () => {
+    setFormData({
+      email: 'test@example.com',
+      password: 'password123'
+    });
   };
 
   const features = [
@@ -188,6 +211,41 @@ function LoginPage() {
           </div>
 
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8">
+            {/* Debug Toggle */}
+            <div className="mb-4 flex items-center justify-between">
+              <button
+                onClick={() => setShowDebug(!showDebug)}
+                className="flex items-center space-x-1 text-xs text-gray-500 hover:text-gray-700"
+              >
+                <SafeIcon icon={FiInfo} className="w-3 h-3" />
+                <span>Debug Info</span>
+              </button>
+              <button
+                onClick={handleTestLogin}
+                className="text-xs text-coffee-600 hover:text-coffee-700 underline"
+              >
+                Use Test Credentials
+              </button>
+            </div>
+
+            {/* Debug Panel */}
+            {showDebug && (
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <h4 className="font-bold text-gray-700 mb-2 text-sm">Debug Information:</h4>
+                <div className="text-xs text-gray-600 space-y-1 max-h-32 overflow-y-auto font-mono">
+                  {debugInfo.slice(-8).map((info, index) => (
+                    <div key={index}>{info.message}</div>
+                  ))}
+                </div>
+                <button
+                  onClick={forceLogin}
+                  className="mt-2 px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600"
+                >
+                  🔧 Force Login
+                </button>
+              </div>
+            )}
+
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-red-700 text-sm">{error}</p>
@@ -211,6 +269,7 @@ function LoginPage() {
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
                     placeholder="Enter your email"
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -231,11 +290,13 @@ function LoginPage() {
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coffee-500 focus:border-transparent"
                     placeholder="Enter your password"
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isSubmitting}
                   >
                     <SafeIcon icon={showPassword ? FiEyeOff : FiEye} className="w-4 h-4" />
                   </button>
@@ -244,10 +305,10 @@ function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isSubmitting}
                 className="w-full flex items-center justify-center space-x-2 py-3 bg-coffee-500 text-white rounded-lg hover:bg-coffee-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                {loading ? (
+                {loading || isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Signing In...</span>
@@ -258,13 +319,23 @@ function LoginPage() {
               </button>
             </form>
 
-            {/* Account Request Information */}
+            {/* Test Account Info */}
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">Need an Account?</h4>
-              <p className="text-sm text-blue-800 mb-3">
+              <h4 className="font-medium text-blue-900 mb-2">Test Account</h4>
+              <div className="text-sm text-blue-800 space-y-1">
+                <p><strong>Email:</strong> test@example.com</p>
+                <p><strong>Password:</strong> password123</p>
+                <p className="text-xs text-blue-600 mt-2">Click "Use Test Credentials" to auto-fill</p>
+              </div>
+            </div>
+
+            {/* Account Request Information */}
+            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <h4 className="font-medium text-gray-700 mb-2">Need an Account?</h4>
+              <p className="text-sm text-gray-600 mb-3">
                 Accounts are created and managed by your system administrator.
               </p>
-              <div className="text-xs text-blue-700 space-y-1">
+              <div className="text-xs text-gray-600 space-y-1">
                 <p>• Contact your IT administrator for account creation</p>
                 <p>• Provide your email address and required access level</p>
                 <p>• You'll receive login credentials once your account is set up</p>

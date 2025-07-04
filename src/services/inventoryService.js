@@ -15,21 +15,19 @@ export const locationService = {
   async getAll() {
     try {
       console.log('Fetching locations...');
-      
       // Test connection first
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty locations');
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('locations_fyngan2024')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
-      
       console.log(`Loaded ${data?.length || 0} locations`);
       return data || [];
     } catch (error) {
@@ -45,7 +43,7 @@ export const locationService = {
         .insert([location])
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -61,7 +59,7 @@ export const locationService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -75,7 +73,7 @@ export const locationService = {
         .from('locations_fyngan2024')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -89,20 +87,18 @@ export const categoryService = {
   async getAll() {
     try {
       console.log('Fetching categories...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty categories');
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('categories_fyngan2024')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
-      
       console.log(`Loaded ${data?.length || 0} categories`);
       return data || [];
     } catch (error) {
@@ -118,7 +114,7 @@ export const categoryService = {
         .insert([category])
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -134,7 +130,7 @@ export const categoryService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -148,7 +144,7 @@ export const categoryService = {
         .from('categories_fyngan2024')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -162,20 +158,18 @@ export const supplierService = {
   async getAll() {
     try {
       console.log('Fetching suppliers...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty suppliers');
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('suppliers_fyngan2024')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
-      
       console.log(`Loaded ${data?.length || 0} suppliers`);
       return data || [];
     } catch (error) {
@@ -191,7 +185,7 @@ export const supplierService = {
         .insert([supplier])
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -205,13 +199,12 @@ export const itemService = {
   async getAll() {
     try {
       console.log('Fetching items...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty items');
         return [];
       }
-      
+
       // First get items with basic relations
       const { data: items, error: itemsError } = await supabase
         .from('items_fyngan2024')
@@ -221,7 +214,7 @@ export const itemService = {
           supplier:supplier_id(id, name)
         `)
         .order('name');
-      
+
       if (itemsError) {
         console.error('Error fetching items:', itemsError);
         return [];
@@ -281,9 +274,8 @@ export const itemService = {
         .insert([item])
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Item created successfully:', data.id);
       return data;
     } catch (error) {
@@ -302,9 +294,8 @@ export const itemService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Item updated successfully:', id);
       return data;
     } catch (error) {
@@ -321,9 +312,8 @@ export const itemService = {
         .from('items_fyngan2024')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
-      
       console.log('Item deleted successfully:', id);
       return true;
     } catch (error) {
@@ -346,9 +336,8 @@ export const itemService = {
         })
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Stock updated successfully');
       return data;
     } catch (error) {
@@ -363,13 +352,12 @@ export const orderService = {
   async getAll() {
     try {
       console.log('Fetching orders...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty orders');
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('orders_fyngan2024')
         .select(`
@@ -379,9 +367,8 @@ export const orderService = {
           supplier:supplier_id(id, name)
         `)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
       console.log(`Loaded ${data?.length || 0} orders`);
       return data || [];
     } catch (error) {
@@ -402,9 +389,8 @@ export const orderService = {
         }])
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Order created successfully:', data.id);
       return data;
     } catch (error) {
@@ -426,9 +412,8 @@ export const orderService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Order updated successfully:', id);
       return data;
     } catch (error) {
@@ -445,9 +430,8 @@ export const orderService = {
         .from('orders_fyngan2024')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
-      
       console.log('Order deleted successfully:', id);
       return true;
     } catch (error) {
@@ -462,13 +446,12 @@ export const transferService = {
   async getAll() {
     try {
       console.log('Fetching transfers...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty transfers');
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
         .select(`
@@ -478,9 +461,8 @@ export const transferService = {
           to_location:to_location_id(id, name)
         `)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
       console.log(`Loaded ${data?.length || 0} transfers`);
       return data || [];
     } catch (error) {
@@ -501,9 +483,8 @@ export const transferService = {
         }])
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Transfer created successfully:', data.id);
       return data;
     } catch (error) {
@@ -525,9 +506,8 @@ export const transferService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Transfer updated successfully:', id);
       return data;
     } catch (error) {
@@ -546,7 +526,7 @@ export const transferService = {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (fetchError) throw fetchError;
 
       // Update stock levels manually (since we don't have the RPC function)
@@ -593,7 +573,7 @@ export const transferService = {
       // Mark transfer as completed
       const { data, error } = await supabase
         .from('transfers_fyngan2024')
-        .update({ 
+        .update({
           status: 'completed',
           completed_date: new Date().toISOString().split('T')[0],
           updated_at: new Date().toISOString()
@@ -601,9 +581,8 @@ export const transferService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('Transfer completed successfully:', id);
       return data;
     } catch (error) {
@@ -620,9 +599,8 @@ export const transferService = {
         .from('transfers_fyngan2024')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
-      
       console.log('Transfer deleted successfully:', id);
       return true;
     } catch (error) {
@@ -637,21 +615,19 @@ export const userService = {
   async getProfile(userId) {
     try {
       console.log('Fetching user profile for:', userId);
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning null profile');
         return null;
       }
-      
+
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .select('*')
         .eq('id', userId)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') throw error;
-      
       console.log('User profile fetched:', data ? 'found' : 'not found');
       return data;
     } catch (error) {
@@ -673,9 +649,8 @@ export const userService = {
         })
         .select()
         .single();
-      
+
       if (error) throw error;
-      
       console.log('User profile updated successfully');
       return data;
     } catch (error) {
@@ -687,20 +662,18 @@ export const userService = {
   async getAll() {
     try {
       console.log('Fetching all users...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         console.warn('Database not accessible, returning empty users');
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('users_fyngan2024')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
-      
       console.log(`Loaded ${data?.length || 0} users`);
       return data || [];
     } catch (error) {
@@ -717,19 +690,16 @@ export const subscribeToTable = (tableName, callback) => {
     
     const subscription = supabase
       .channel(`${tableName}_changes`)
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: tableName 
-        }, 
-        (payload) => {
-          console.log('Real-time update received for', tableName, ':', payload);
-          if (callback && typeof callback === 'function') {
-            callback(payload);
-          }
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: tableName
+      }, (payload) => {
+        console.log('Real-time update received for', tableName, ':', payload);
+        if (callback && typeof callback === 'function') {
+          callback(payload);
         }
-      )
+      })
       .subscribe((status) => {
         console.log('Subscription status for', tableName, ':', status);
       });
@@ -755,15 +725,10 @@ export const analyticsService = {
         const categoryName = item.category?.name || 'Uncategorized';
         const totalQuantity = Object.values(item.locations).reduce((sum, loc) => sum + (loc.quantity || 0), 0);
         const itemValue = totalQuantity * (item.cost || 0);
-        
         categoryValues[categoryName] = (categoryValues[categoryName] || 0) + itemValue;
       });
       
-      const result = Object.entries(categoryValues).map(([category, value]) => ({
-        category,
-        value
-      }));
-      
+      const result = Object.entries(categoryValues).map(([category, value]) => ({ category, value }));
       console.log('Inventory value calculated:', result);
       return result;
     } catch (error) {
@@ -775,12 +740,11 @@ export const analyticsService = {
   async getLowStockItems() {
     try {
       console.log('Fetching low stock items...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('item_locations_fyngan2024')
         .select(`
@@ -789,9 +753,8 @@ export const analyticsService = {
           location:location_id(id, name)
         `)
         .in('status', ['low-stock', 'out-of-stock']);
-      
+
       if (error) throw error;
-      
       console.log(`Found ${data?.length || 0} low stock items`);
       return data || [];
     } catch (error) {
@@ -803,12 +766,11 @@ export const analyticsService = {
   async getExpiringItems(days = 30) {
     try {
       console.log('Fetching expiring items...');
-      
       const isConnected = await testConnection();
       if (!isConnected) {
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('items_fyngan2024')
         .select(`
@@ -821,9 +783,8 @@ export const analyticsService = {
         `)
         .lte('expiry_date', new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString())
         .gte('expiry_date', new Date().toISOString());
-      
+
       if (error) throw error;
-      
       console.log(`Found ${data?.length || 0} expiring items`);
       return data || [];
     } catch (error) {

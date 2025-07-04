@@ -23,11 +23,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error) => {
   console.error('Supabase error:', error);
-  
   if (error?.message) {
     return error.message;
   }
-  
   return 'An unexpected error occurred';
 };
 
@@ -35,12 +33,10 @@ export const handleSupabaseError = (error) => {
 export const checkAuth = async () => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    
     if (error) {
       console.error('Auth check error:', error);
       return null;
     }
-    
     return session;
   } catch (error) {
     console.error('Auth check failed:', error);

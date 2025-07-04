@@ -101,7 +101,7 @@ function UserProfileDropdown() {
               <img 
                 src={user.avatar} 
                 alt="Profile" 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover" 
               />
             ) : (
               <span className="text-white font-medium text-sm">
@@ -123,15 +123,18 @@ function UserProfileDropdown() {
           {isOpen && (
             <>
               {/* Overlay */}
-              <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-
+              <div 
+                className="fixed inset-0 z-30" 
+                onClick={() => setIsOpen(false)} 
+              />
+              
               {/* Dropdown Panel */}
               <motion.div
                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-40 overflow-hidden"
               >
                 {/* User Info Header */}
                 <div className="p-4 bg-gradient-to-r from-coffee-50 to-coffee-100 dark:from-gray-700 dark:to-gray-600 border-b border-gray-200 dark:border-gray-700">
@@ -141,7 +144,7 @@ function UserProfileDropdown() {
                         <img 
                           src={user.avatar} 
                           alt="Profile" 
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover" 
                         />
                       ) : (
                         <span className="text-white font-bold text-lg">
@@ -245,9 +248,9 @@ function UserProfileDropdown() {
       </div>
 
       {/* Edit Profile Modal */}
-      <EditProfileModal
-        isOpen={showEditProfile}
-        onClose={() => setShowEditProfile(false)}
+      <EditProfileModal 
+        isOpen={showEditProfile} 
+        onClose={() => setShowEditProfile(false)} 
       />
     </>
   );

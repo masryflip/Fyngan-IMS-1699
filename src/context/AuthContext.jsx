@@ -9,48 +9,74 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
+  const [debugInfo, setDebugInfo] = useState([]);
+
+  // Debug logging function
+  const addDebugInfo = (message, data = null) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const debugEntry = `[${timestamp}] ${message}`;
+    console.log(debugEntry, data || '');
+    setDebugInfo(prev => [...prev.slice(-10), { message: debugEntry, data }]);
+  };
 
   useEffect(() => {
     let isMounted = true;
     let timeoutId;
 
-    // Set a maximum loading time of 10 seconds
+    addDebugInfo('🔄 Starting authentication check...');
+
+    // Set a maximum loading time
     timeoutId = setTimeout(() => {
       if (isMounted && loading) {
-        console.warn('Authentication check timed out, proceeding with no auth');
+        addDebugInfo('⚠️ Authentication check timed out');
         setLoading(false);
         setIsAuthenticated(false);
         setUser(null);
         setSession(null);
       }
-    }, 10000);
+    }, 10000); // Increased to 10 seconds
 
     // Get initial session
     const getInitialSession = async () => {
       try {
-        console.log('Checking for existing session...');
+        addDebugInfo('🔍 Checking for existing session...');
         
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          addDebugInfo('❌ Error getting session', error.message);
           throw error;
         }
         
         if (session && isMounted) {
-          console.log('Found existing session for user:', session.user.id);
+          addDebugInfo('✅ Found existing session', session.user.email);
           setSession(session);
           setIsAuthenticated(true);
-          await loadUserProfile(session.user.id);
+          
+          // Create basic user immediately to unblock UI
+          const basicUser = {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.email?.split('@')[0] || 'User',
+            role: 'staff'
+          };
+          setUser(basicUser);
+          addDebugInfo('👤 Set basic user', basicUser.email);
+          
+          // Load full profile in background
+          setTimeout(() => {
+            loadUserProfile(session.user.id).catch(error => {
+              addDebugInfo('⚠️ Profile loading failed, keeping basic user', error.message);
+            });
+          }, 100);
         } else {
-          console.log('No existing session found');
+          addDebugInfo('ℹ️ No existing session found');
         }
       } catch (error) {
-        console.error('Error getting initial session:', error);
-        // Don't throw, just continue without auth
+        addDebugInfo('❌ Error in getInitialSession', error.message);
       } finally {
         if (isMounted) {
-          console.log('Setting loading to false');
+          addDebugInfo('✅ Setting loading to false');
           setLoading(false);
           if (timeoutId) clearTimeout(timeoutId);
         }
@@ -62,29 +88,38 @@ export function AuthProvider({ children }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        addDebugInfo(`🔄 Auth state changed: ${event}`, session?.user?.email);
         
         if (!isMounted) return;
 
         setSession(session);
-        setIsAuthenticated(!!session);
         
         if (session?.user) {
-          setLoading(true);
-          try {
-            await loadUserProfile(session.user.id);
-          } catch (error) {
-            console.error('Error loading user profile during auth change:', error);
-            // Create a basic user object as fallback
-            setUser({
-              id: session.user.id,
-              email: session.user.email,
-              name: session.user.email?.split('@')[0] || 'User',
-              role: 'staff'
+          addDebugInfo('✅ User signed in', session.user.email);
+          setIsAuthenticated(true);
+          
+          // Create basic user immediately
+          const basicUser = {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.email?.split('@')[0] || 'User',
+            role: 'staff'
+          };
+          setUser(basicUser);
+          addDebugInfo('👤 User object created', basicUser.email);
+          
+          // Load full profile in background
+          setTimeout(() => {
+            loadUserProfile(session.user.id).catch(error => {
+              addDebugInfo('⚠️ Profile loading failed during auth change', error.message);
             });
-          }
+          }, 100);
+          
+          // Ensure loading is false
           setLoading(false);
         } else {
+          addDebugInfo('❌ User signed out');
+          setIsAuthenticated(false);
           setUser(null);
           setLoading(false);
         }
@@ -95,127 +130,71 @@ export function AuthProvider({ children }) {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
+      addDebugInfo('🧹 Cleanup completed');
     };
   }, []);
 
   const loadUserProfile = async (userId) => {
     try {
-      console.log('Loading user profile for:', userId);
+      addDebugInfo('📋 Loading user profile...', userId);
       
-      // Try to get existing profile with timeout
-      const profilePromise = userService.getProfile(userId);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile loading timeout')), 5000)
-      );
+      const profile = await userService.getProfile(userId);
       
-      let profile;
-      try {
-        profile = await Promise.race([profilePromise, timeoutPromise]);
-      } catch (error) {
-        console.warn('Profile loading failed or timed out:', error);
-        profile = null;
+      if (profile) {
+        setUser(prev => ({
+          ...prev,
+          ...profile
+        }));
+        addDebugInfo('✅ Profile loaded successfully', profile.name);
+      } else {
+        addDebugInfo('ℹ️ No profile found, keeping basic user');
       }
-      
-      // If no profile exists or loading failed, create a basic one
-      if (!profile) {
-        console.log('Creating basic user profile...');
-        
-        try {
-          const { data: authUser } = await supabase.auth.getUser();
-          
-          const defaultProfile = {
-            id: userId,
-            email: authUser.user?.email || '',
-            name: authUser.user?.user_metadata?.name || 
-                  authUser.user?.email?.split('@')[0] || 
-                  'User',
-            role: 'staff',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          
-          // Try to create profile in database, but don't fail if it doesn't work
-          try {
-            profile = await userService.updateProfile(userId, defaultProfile);
-            console.log('Created new profile in database:', profile);
-          } catch (dbError) {
-            console.warn('Failed to create profile in database, using local profile:', dbError);
-            profile = defaultProfile;
-          }
-        } catch (authError) {
-          console.error('Failed to get auth user data:', authError);
-          // Use minimal profile
-          profile = {
-            id: userId,
-            email: 'user@example.com',
-            name: 'User',
-            role: 'staff'
-          };
-        }
-      }
-      
-      setUser({
-        id: userId,
-        ...profile
-      });
-      
-      console.log('User profile loaded successfully:', profile);
     } catch (error) {
-      console.error('Error loading user profile:', error);
-      
-      // Create minimal user object as final fallback
-      const fallbackUser = {
-        id: userId,
-        email: session?.user?.email || 'user@example.com',
-        name: session?.user?.email?.split('@')[0] || 'User',
-        role: 'staff'
-      };
-      
-      setUser(fallbackUser);
-      console.log('Using fallback user:', fallbackUser);
+      addDebugInfo('❌ Error loading profile', error.message);
     }
   };
 
   const signIn = async (email, password) => {
     try {
       setLoading(true);
-      console.log('Attempting to sign in user:', email);
+      addDebugInfo('🔐 Starting sign in process...', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) throw error;
+      if (error) {
+        addDebugInfo('❌ Sign in failed', error.message);
+        setLoading(false);
+        throw error;
+      }
       
-      console.log('Sign in successful:', data);
-      
-      // The onAuthStateChange will handle the rest
+      addDebugInfo('✅ Sign in successful', data.user?.email);
       return { data, error: null };
     } catch (error) {
-      console.error('Sign in error:', error);
-      return { data: null, error };
-    } finally {
+      addDebugInfo('❌ Sign in error', error.message);
       setLoading(false);
+      return { data: null, error };
     }
   };
 
   const signOut = async () => {
     try {
       setLoading(true);
-      console.log('Signing out user');
+      addDebugInfo('🔓 Signing out...');
       
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Clear local state
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
+      setDebugInfo([]); // Clear debug info on logout
       
-      console.log('Sign out successful');
+      addDebugInfo('✅ Sign out successful');
     } catch (error) {
-      console.error('Sign out error:', error);
+      addDebugInfo('❌ Sign out error', error.message);
     } finally {
       setLoading(false);
     }
@@ -225,7 +204,7 @@ export function AuthProvider({ children }) {
     try {
       if (!user?.id) throw new Error('No authenticated user');
       
-      console.log('Updating user profile:', profileData);
+      addDebugInfo('📝 Updating user profile...');
       
       const updatedProfile = await userService.updateProfile(user.id, profileData);
       
@@ -234,17 +213,30 @@ export function AuthProvider({ children }) {
         ...updatedProfile
       }));
       
-      console.log('Profile updated successfully:', updatedProfile);
+      addDebugInfo('✅ Profile updated successfully');
       return updatedProfile;
     } catch (error) {
-      console.error('Error updating profile:', error);
+      addDebugInfo('❌ Error updating profile', error.message);
       throw error;
     }
   };
 
+  // Debug method to force login (for testing)
+  const forceLogin = () => {
+    addDebugInfo('🔧 Force login triggered');
+    setIsAuthenticated(true);
+    setUser({
+      id: 'debug-user',
+      email: 'debug@test.com',
+      name: 'Debug User',
+      role: 'admin'
+    });
+    setLoading(false);
+  };
+
   // Legacy compatibility methods
   const login = (userData) => {
-    console.log('Legacy login called with:', userData);
+    addDebugInfo('🔧 Legacy login called', userData);
   };
 
   const logout = () => {
@@ -257,11 +249,13 @@ export function AuthProvider({ children }) {
     user,
     session,
     loading,
+    debugInfo,
 
-    // Methods - removed signUp
+    // Methods
     signIn,
     signOut,
     updateUserProfile,
+    forceLogin,
     
     // Legacy compatibility
     login,
